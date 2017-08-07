@@ -5,34 +5,14 @@ let temperatureInterval;
 
 module.exports = (cfg) => {
     config = cfg;
-    console.log('loaded node-home-heater', config);
+    console.log('loaded smartnode-thermostat CLIENT', config);
     
     if (config.sensor) {
-        switch (config.sensor.model) {
-            case 'ds1820':
-                try {
-                    sensor = require('ds1820-temp');
-                } catch(e) {
-                    sensor = { 
-                        readDevice: async () => {
-                            return new Promise((resolve, reject) => {  resolve({ value: 21.2 }); });
-                        }
-                    }
-                }
-            break;
-        }
+        sensor = require('./lib/sensors.js')(config.sensor.model);
     }
     
     if (config.relay) {
-        try {
-            gpio = require('rpi-gpio');
-        } catch(e) {
-            gpio = { 
-                setup: () => {} ,
-                on: () => {},
-                destroy: () => {}
-            }
-        }
+        gpio = require('./lib/gpio.js');
     }
     
     return {
@@ -41,11 +21,11 @@ module.exports = (cfg) => {
     }
 }
 
-function load(socket) {
-    console.log('pluginloaded')
+async function load(socket) {
     socket.emit('pluginloaded');
     
     if (config.sensor) {
+        socket.emit('temperature', (await _getTemperature()));
         temperatureInterval = setInterval(async () => {
             console.log('emit temperature', (await _getTemperature()));
             socket.emit('temperature', (await _getTemperature()));
@@ -53,7 +33,17 @@ function load(socket) {
     }
     
     if (config.relay) {
-        gpio.setup(config.relay, gpio.DIR_OUT);
+        gpio.setup(config.relay, gpio.DIR_HIGH, () => {
+            // gpio is ready
+            socket.on('on', (cb) => {
+                gpio.write(config.relay, true, cb);
+            });
+
+            socket.on('off', (cb) => {
+                gpio.write(config.relay, false, cb);
+            });
+        });
+
     }
 }
 
