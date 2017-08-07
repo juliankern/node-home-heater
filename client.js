@@ -2,7 +2,6 @@ let config;
 let sensor;
 let gpio;
 let temperatureInterval;
-let displayTimeout;
 
 module.exports = (cfg) => {
     config = cfg;
@@ -11,12 +10,20 @@ module.exports = (cfg) => {
     if (config.sensor) {
         switch (config.sensor.model) {
             case 'ds1820':
-                sensor = require('ds1820-temp');
+                try {
+                    sensor = require('ds1820-temp');
+                } catch(e) {
+                    sensor = { 
+                        readDevice: async () => {
+                            return new Promise((resolve, reject) => {  resolve({ value: 21.2 }); });
+                        }
+                    }
+                }
             break;
         }
     }
     
-    if (config.relay || config.button || config.display) {
+    if (config.relay) {
         try {
             gpio = require('rpi-gpio');
         } catch(e) {
@@ -40,31 +47,13 @@ function load(socket) {
     
     if (config.sensor) {
         temperatureInterval = setInterval(async () => {
+            console.log('emit temperature', (await _getTemperature()));
             socket.emit('temperature', (await _getTemperature()));
         }, (config.sensor.interval || 30) * 1000);
     }
     
     if (config.relay) {
         gpio.setup(config.relay, gpio.DIR_OUT);
-    }
-    
-    if (config.display) {
-        gpio.setup(config.display, gpio.DIR_OUT);
-    }
-    
-    if (config.button) {
-        gpio.on('change', async (channel, value) => {
-            if (channel === config.button && value) {
-                if (displayTimeout) clearTimeout(displayTimeout);
-                
-                await gpio.write(config.display, true);
-                
-                displayTimeout = setTimeout(() => {
-                    gpio.write(config.display, false);
-                }, (config.display.timeout || 10) * 1000);
-            }
-        });
-        gpio.setup(config.button, gpio.DIR_IN, gpio.EDGE_BOTH);
     }
 }
 

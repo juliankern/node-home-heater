@@ -1,3 +1,4 @@
 module.exports = {
-    Client: require('./client.js')
+    Client: require('./client.js'),
+    Server: require('./server.js')
 }
