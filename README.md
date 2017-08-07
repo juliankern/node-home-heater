@@ -1,2 +1,2 @@
 # smartnode-thermostat
-Heater plugin for node-home
+Thermostat plugin for SmartNode
