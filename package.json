@@ -1,0 +1,28 @@
+{
+  "name": "node-home-heater",
+  "version": "1.0.0",
+  "description": "Heater plugin for node-home",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/juliankern/node-home-heater.git"
+  },
+  "keywords": [
+    "nodejs",
+    "node-home",
+    "javascript"
+  ],
+  "author": "Julian Kern <mail@juliankern.com> (https://juliankern.com)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/juliankern/node-home-heater/issues"
+  },
+  "homepage": "https://github.com/juliankern/node-home-heater#readme",
+  "dependencies": {
+    "ds1820-temp": "^1.0.0",
+    "rpi-gpio": "^0.8.1"
+  }
+}
