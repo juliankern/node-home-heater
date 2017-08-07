@@ -1,7 +1,7 @@
 {
   "name": "smartnode-thermostat",
   "version": "1.0.0",
-  "description": "Heater plugin for node-home",
+  "description": "Thermostat plugin for SmartNode",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
