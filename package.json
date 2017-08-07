@@ -23,6 +23,7 @@
   "homepage": "https://github.com/juliankern/smartnode-thermostat#readme",
   "dependencies": {
     "ds1820-temp": "^1.0.0",
+    "homekit": "0.0.3",
     "moment": "^2.18.1",
     "rpi-gpio": "^0.8.1"
   }

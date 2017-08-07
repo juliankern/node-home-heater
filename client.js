@@ -1,10 +1,12 @@
 let config;
 let sensor;
 let gpio;
+let utils;
 let temperatureInterval;
 
-module.exports = (cfg) => {
+module.exports = (cfg, tools) => {
     config = cfg;
+    utils = tools;
     console.log('loaded smartnode-thermostat CLIENT', config);
     
     if (config.sensor) {
@@ -42,9 +44,15 @@ async function load(socket) {
             socket.on('off', (cb) => {
                 gpio.write(config.relay, false, cb);
             });
+            
+            socket.on('identify', (paired, cb) => {
+                global.muted('HomeKit identify - paired:', paired);
+                cb({ success: true });
+            })
         });
-
     }
+    
+    return true;
 }
 
 function unload(socket) {
