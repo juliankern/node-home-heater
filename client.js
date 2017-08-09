@@ -7,7 +7,6 @@ let temperatureInterval;
 module.exports = (cfg, tools) => {
     config = cfg;
     utils = tools;
-    console.log('loaded smartnode-thermostat CLIENT', config);
     
     if (config.sensor) {
         sensor = require('./lib/sensors.js')(config.sensor.model);
@@ -27,10 +26,10 @@ async function load(socket) {
     socket.emit('pluginloaded');
     
     if (config.sensor) {
-        socket.emit('temperature', (await _getTemperature()));
+        socket.emit('temperature', { value: (await _getTemperature()), time: Date.now() });
         temperatureInterval = setInterval(async () => {
-            console.log('emit temperature', (await _getTemperature()));
-            socket.emit('temperature', (await _getTemperature()));
+            global.log('Send temperature', (await _getTemperature()));
+            socket.emit('temperature', { value: (await _getTemperature()), time: Date.now() });
         }, (config.sensor.interval || 30) * 1000);
     }
     
