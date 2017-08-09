@@ -4,9 +4,11 @@ const moment = require('moment');
 module.exports = async (SmartNodePlugin) => {
     let homekitProperties;
     let nologs = false;
+    let thermostat;
 
     let config = SmartNodePlugin.config;
     let storage = SmartNodePlugin.storage;
+    let socket = SmartNodePlugin.socket;
 
     let HomeKit = require('./lib/homekit.js');
     
@@ -26,25 +28,21 @@ module.exports = async (SmartNodePlugin) => {
         await storage.set('temperatureLogs', []);
         nologs = true;
     }
+    
+    SmartNodePlugin.setGlobals({}, {
+        temperature: {
+            current: await _fixTemperature((await storage.get('currentTemperature')) || (await storage.get('currentTemperature'))),
+            target: await _fixTemperature((await storage.get('targetTemperature'))),
+            unit: !!(await storage.get('temperatureDisplayUnits')) ? 'F' : 'C'
+        }
+    });
 
     return {
-        exports: {
-            global: {},
-            room: {
-                temperature: async () => {
-                    return {
-                        current: await _fixTemperature((await storage.get('currentTemperature')) || (await storage.get('currentTemperature'))),
-                        target: await _fixTemperature((await storage.get('targetTemperature'))),
-                        unit: !!(await storage.get('temperatureDisplayUnits')) ? 'F' : 'C'
-                    }
-                }
-            }
-        },
         load,
         unload
     }
     
-    function load(socket) {
+    function load() {
         let logTimer = moment();
 
         socket.on('temperature', async (data) => {
@@ -67,9 +65,9 @@ module.exports = async (SmartNodePlugin) => {
             }
         });
 
-        let accessory = new HomeKit.Accessory(`Thermostat ${config.room}`, uuid);
+        thermostat = new HomeKit.Accessory(`Thermostat ${config.room}`, uuid);
 
-        accessory.on('identify', (paired, callback) => {
+        thermostat.on('identify', (paired, callback) => {
             if (paired) {
                 storage.set('homekit-properties', homekitProperties);
             }
@@ -79,12 +77,12 @@ module.exports = async (SmartNodePlugin) => {
             })
         });
 
-        accessory.getService(HomeKit.Service.AccessoryInformation)
+        thermostat.getService(HomeKit.Service.AccessoryInformation)
             .setCharacteristic(HomeKit.Characteristic.Manufacturer, 'juliankern.com')
             .setCharacteristic(HomeKit.Characteristic.Model, pkg.name)
             .setCharacteristic(HomeKit.Characteristic.SerialNumber, 'A0000001');
 
-        accessory.addService(HomeKit.Service.Thermostat, `Thermostat ${config.room}`)
+        thermostat.addService(HomeKit.Service.Thermostat, `Thermostat ${config.room}`)
             .getCharacteristic(HomeKit.Characteristic.CurrentTemperature)
             .on('get', async (callback) => {
                 global.muted('HK get CurrentTemperature:', (await storage.get('currentTemperature')));
@@ -92,7 +90,7 @@ module.exports = async (SmartNodePlugin) => {
             })
         ;
         
-        accessory.getService(HomeKit.Service.Thermostat)
+        thermostat.getService(HomeKit.Service.Thermostat)
             .getCharacteristic(HomeKit.Characteristic.TargetTemperature)
             .on('get', async (callback) => {
                 global.muted('HK get TargetTemperature:', (await storage.get('targetTemperature')) || (await storage.get('currentTemperature')));
@@ -100,7 +98,7 @@ module.exports = async (SmartNodePlugin) => {
             })
         ;
         
-        accessory.getService(HomeKit.Service.Thermostat)
+        thermostat.getService(HomeKit.Service.Thermostat)
             .getCharacteristic(HomeKit.Characteristic.TargetTemperature)
             .on('set', async (value, callback) => {
                 global.muted('HK Set TargetTemperature:', +value);
@@ -109,7 +107,7 @@ module.exports = async (SmartNodePlugin) => {
             })
         ;
         
-        accessory.getService(HomeKit.Service.Thermostat)
+        thermostat.getService(HomeKit.Service.Thermostat)
             .getCharacteristic(HomeKit.Characteristic.TemperatureDisplayUnits)
             .on('get', async (callback) => {
                 global.muted('HK get TemperatureDisplayUnits', (await storage.get('temperatureDisplayUnits')) || HomeKit.Characteristic.TemperatureDisplayUnits.CELSIUS);
@@ -117,7 +115,7 @@ module.exports = async (SmartNodePlugin) => {
             })
         ;
         
-        accessory.getService(HomeKit.Service.Thermostat)
+        thermostat.getService(HomeKit.Service.Thermostat)
             .getCharacteristic(HomeKit.Characteristic.TemperatureDisplayUnits)
             .on('set', async (value, callback) => {
                 global.muted('HK set TemperatureDisplayUnits:', value);
@@ -126,7 +124,7 @@ module.exports = async (SmartNodePlugin) => {
             })
         ;
         
-        accessory.getService(HomeKit.Service.Thermostat)
+        thermostat.getService(HomeKit.Service.Thermostat)
             .getCharacteristic(HomeKit.Characteristic.CurrentHeatingCoolingState)
             .on('get', async (callback) => {
                 global.muted('HK get CurrentHeatingCoolingState:', (await storage.get('currentHeatingCoolingState')) || HomeKit.Characteristic.CurrentHeatingCoolingState.OFF);
@@ -134,7 +132,7 @@ module.exports = async (SmartNodePlugin) => {
             })
         ;
         
-        accessory.getService(HomeKit.Service.Thermostat)
+        thermostat.getService(HomeKit.Service.Thermostat)
             .getCharacteristic(HomeKit.Characteristic.CurrentHeatingCoolingState)
             .on('set', async (value, callback) => {
                 global.muted('HK Set CurrentHeatingCoolingState:', value);
@@ -143,7 +141,7 @@ module.exports = async (SmartNodePlugin) => {
             })
         ;
         
-        accessory.getService(HomeKit.Service.Thermostat)
+        thermostat.getService(HomeKit.Service.Thermostat)
             .getCharacteristic(HomeKit.Characteristic.TargetHeatingCoolingState)
             .on('get', async (callback) => {
                 global.muted('HK get TargetHeatingCoolingState:', (await storage.get('targetHeatingCoolingState')) || HomeKit.Characteristic.TargetHeatingCoolingState.AUTO);
@@ -151,7 +149,7 @@ module.exports = async (SmartNodePlugin) => {
             })
         ;
         
-        accessory.getService(HomeKit.Service.Thermostat)
+        thermostat.getService(HomeKit.Service.Thermostat)
             .getCharacteristic(HomeKit.Characteristic.TargetHeatingCoolingState)
             .on('set', async (value, callback) => {
                 global.muted('HK Set TargetHeatingCoolingState:', value);
@@ -160,13 +158,15 @@ module.exports = async (SmartNodePlugin) => {
             })
         ;
         
-        accessory.publish(homekitProperties);
+        thermostat.publish(homekitProperties);
         
         global.muted(`Published HomeKit ${pkg.name} with properties:`, homekitProperties);
     }
 
-    function unload(socket) {
-        accessory.destroy();
+    function unload() {
+        thermostat.destroy();
+        socket.removeAllListeners('temperature');
+        SmartNodePlugin.removeAllListeners('globalsChanged');
     }
 
     async function generateHomekitProperties() {
