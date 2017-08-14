@@ -10,13 +10,13 @@ module.exports = async (SmartNodeServerPlugin) => {
     let config = SmartNodeServerPlugin.config;
     let storage = SmartNodeServerPlugin.storage;
     let socket = SmartNodeServerPlugin.socket;
-
+    
     SmartNodeServerPlugin.globals.room = [
         'temperature.current',
         'temperature.target',
         'temperature.unit',
-        'heaterState.current',
-        'heaterState.target'
+        'heater.current',
+        'heater.target'
     ];
 
     let HomeKit = require('./lib/homekit.js');
@@ -28,7 +28,7 @@ module.exports = async (SmartNodeServerPlugin) => {
     }
 
     SmartNodeServerPlugin.on('globalsChanged', (changed) => {
-        console.log('Globals have changed, update?!');
+        console.log('Globals have changed, update?!', changed);
     })
     
     let uuid = HomeKit.uuid.generate(`homekit:${pkg.name}`);
@@ -37,14 +37,65 @@ module.exports = async (SmartNodeServerPlugin) => {
         storage.set('temperatureLogs', []);
         nologs = true;
     }
-
-    _updateGlobals();
+    
+    SmartNodeServerPlugin.setGlobals({}, {
+        temperature: {
+            current: _fixTemperature(storage.get('currentTemperature')),
+            target: _fixTemperature(storage.get('targetTemperature')  || storage.get('currentTemperature')),
+            unit: !!storage.get('temperatureDisplayUnits') ? 'F' : 'C'
+        },
+        heater: {
+            current: storage.get('currentHeatingCoolingState'),
+            target: storage.get('targetHeatingCoolingState')
+        }
+    });
 
     return {
         load,
         unload
-    }
+    } 
     
+    function _checkHeaterStatus() {
+        if (storage.get('targetHeatingCoolingState') === HomeKit.Characteristic.TargetHeatingCoolingState.OFF) {
+            return _heater(false);
+        }
+
+        if (storage.get('targetHeatingCoolingState') === HomeKit.Characteristic.TargetHeatingCoolingState.HEAT) {
+            return _heater(true);
+        }
+
+        // Don't handle TargetHeatingCoolingState.COOL because we're already pretty cool ;-)
+        // Don't handle TargetHeatingCoolingState.AUTO explicitly, because everthing below here is AUTO
+        
+        if (storage.get('currentTemperature') < storage.get('targetTemperature')) {
+            return _heater(true);
+        }
+
+        // turn off if nothing matched
+        return _heater(false);
+    }
+
+    function _heater(status) {
+        // handle status here
+        if (status) {
+            _setHomeKitState('currentHeatingCoolingState', 'CurrentHeatingCoolingState', HomeKit.Characteristic.CurrentHeatingCoolingState.HEAT);
+            global.warn('Turned heater ON!');
+            return true;
+        }
+
+        _setHomeKitState('currentHeatingCoolingState', 'CurrentHeatingCoolingState', HomeKit.Characteristic.CurrentHeatingCoolingState.OFF);
+        global.warn('Turned heater OFF!');
+    }
+
+    function _setHomeKitState(storageKey, HKKey, value) {
+        if (storageKey) {
+            storage.set(storageKey, value);
+        }
+
+        thermostat.getService(HomeKit.Service.Thermostat)
+            .setCharacteristic(HomeKit.Characteristic[HKKey], value);
+    }
+
     function load() {
         let logTimer = moment();
 
@@ -66,6 +117,14 @@ module.exports = async (SmartNodeServerPlugin) => {
 
                 storage.set('temperatureLogs', logs);
             }
+            
+            SmartNodeServerPlugin.setGlobals({}, {
+                temperature: {
+                    current: _fixTemperature(storage.get('currentTemperature'))
+                }
+            });
+
+            _checkHeaterStatus();
         });
 
         thermostat = new HomeKit.Accessory(`Thermostat ${config.room}`, uuid);
@@ -106,7 +165,15 @@ module.exports = async (SmartNodeServerPlugin) => {
             .on('set', (value, callback) => {
                 global.muted('HK Set TargetTemperature:', +value);
                 storage.set('targetTemperature', +value);
-                _updateGlobals();
+
+                SmartNodeServerPlugin.setGlobals({}, {
+                    temperature: {
+                        target: _fixTemperature(storage.get('targetTemperature')  || storage.get('currentTemperature')),
+                    }
+                });
+
+                _checkHeaterStatus();
+
                 callback();
             })
         ;
@@ -124,7 +191,13 @@ module.exports = async (SmartNodeServerPlugin) => {
             .on('set', (value, callback) => {
                 global.muted('HK set TemperatureDisplayUnits:', value);
                 storage.set('temperatureDisplayUnits', value);
-                _updateGlobals();
+
+                SmartNodeServerPlugin.setGlobals({}, {
+                    temperature: {
+                        unit: !!storage.get('temperatureDisplayUnits') ? 'F' : 'C'
+                    }
+                });
+
                 callback();
             })
         ;
@@ -134,16 +207,6 @@ module.exports = async (SmartNodeServerPlugin) => {
             .on('get', (callback) => {
                 global.muted('HK get CurrentHeatingCoolingState:', storage.get('currentHeatingCoolingState') || HomeKit.Characteristic.CurrentHeatingCoolingState.OFF);
                 callback(null, storage.get('currentHeatingCoolingState') || HomeKit.Characteristic.CurrentHeatingCoolingState.OFF);
-            })
-        ;
-        
-        thermostat.getService(HomeKit.Service.Thermostat)
-            .getCharacteristic(HomeKit.Characteristic.CurrentHeatingCoolingState)
-            .on('set', (value, callback) => {
-                global.muted('HK Set CurrentHeatingCoolingState:', value);
-                storage.set('currentHeatingCoolingState', value);
-                _updateGlobals();
-                callback();
             })
         ;
         
@@ -160,7 +223,15 @@ module.exports = async (SmartNodeServerPlugin) => {
             .on('set', (value, callback) => {
                 global.muted('HK Set TargetHeatingCoolingState:', value);
                 storage.set('targetHeatingCoolingState', value);
-                _updateGlobals();
+
+                SmartNodeServerPlugin.setGlobals({}, {
+                    heater: {
+                        target: storage.get('targetHeatingCoolingState')
+                    }
+                });
+
+                _checkHeaterStatus();
+                
                 callback();
             })
         ;
@@ -201,7 +272,7 @@ module.exports = async (SmartNodeServerPlugin) => {
             v = _CtoF(v);
         }
 
-        return v;
+        return v.toFixed(1);
     }
 
     function _updateGlobals() {
