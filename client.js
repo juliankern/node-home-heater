@@ -22,10 +22,14 @@ module.exports = async (SmartNodeClientPlugin) => {
         socket.emit('pluginloaded');
         
         if (config.sensor) {
-            socket.emit('temperature', { value: (await _getTemperature()), time: Date.now() });
+            let temperature = await _getTemperature();
+            global.log('Send temperature', temperature);    
+            socket.emit('temperature', { value: temperature, time: Date.now() });
+            
             temperatureInterval = setInterval(async () => {
-                global.log('Send temperature', (await _getTemperature()));
-                socket.emit('temperature', { value: (await _getTemperature()), time: Date.now() });
+                temperature = await _getTemperature();
+                global.log('Send temperature', temperature);
+                socket.emit('temperature', { value: temperature, time: Date.now() });
             }, (config.sensor.interval || 30) * 1000);
         }
         
