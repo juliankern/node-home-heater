@@ -1,30 +1,62 @@
 {
-  "name": "smartnode-thermostat",
-  "version": "1.0.0",
-  "description": "Thermostat plugin for SmartNode",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+ssh://git@github.com/juliankern/smartnode-thermostat.git"
-  },
-  "keywords": [
-    "nodejs",
-    "node-home",
-    "javascript"
-  ],
-  "author": "Julian Kern <mail@juliankern.com> (https://juliankern.com)",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/juliankern/smartnode-thermostat/issues"
-  },
-  "homepage": "https://github.com/juliankern/smartnode-thermostat#readme",
-  "dependencies": {
-    "ds1820-temp": "^1.0.0",
-    "homekit": "0.0.3",
-    "moment": "^2.18.1",
-    "rpi-gpio": "^0.8.1"
-  }
+    "name": "smartnode-thermostat",
+    "version": "1.0.0",
+    "description": "Thermostat plugin for SmartNode",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+ssh://git@github.com/juliankern/smartnode-thermostat.git"
+    },
+    "keywords": [
+        "nodejs",
+        "node-home",
+        "javascript"
+    ],
+    "author": "Julian Kern <mail@juliankern.com> (https://juliankern.com)",
+    "license": "MIT",
+    "bugs": {
+        "url": "https://github.com/juliankern/smartnode-thermostat/issues"
+    },
+    "homepage": "https://github.com/juliankern/smartnode-thermostat#readme",
+    "dependencies": {
+        "ds1820-temp": "^1.0.0",
+        "homekit": "0.0.3",
+        "moment": "^2.18.1",
+        "rpi-gpio": "^0.8.1"
+    },
+    "configuration": {
+        "relay": {
+            "type": "number",
+            "description": "GPIO port number of the heater relay",
+            "default": 0,
+            "required": true
+        },
+        "sensor": {
+            "type": "object",
+            "description": "Data for the temperature sensor",
+            "properties": {
+                "model": {
+                    "type": "string",
+                    "description": "The model name. The \"ds1820\" is the most common one.",
+                    "default": "ds1820",
+                    "required": true
+                },
+                "address": {
+                    "type": "string",
+                    "description": "The address of your sensor.",
+                    "default": "",
+                    "required": true
+                },
+                "interval": {
+                    "type": "number",
+                    "description": "How often should the temperature get checked?",
+                    "default": 30,
+                    "required": true
+                }
+            }
+        }
+    }
 }

@@ -27,6 +27,12 @@ module.exports = async (SmartNodeServerPlugin) => {
         homekitProperties = await generateHomekitProperties();
     }
 
+    SmartNodeServerPlugin.saveDisplayData('homekit', {
+        description: "HomeKit pincode",
+        type: "string",
+        value: homekitProperties.pincode
+    });
+
     SmartNodeServerPlugin.on('globalsChanged', (changed) => {
         console.log('Globals have changed, update?!', changed);
     })
@@ -212,6 +218,8 @@ module.exports = async (SmartNodeServerPlugin) => {
         thermostat.getService(HomeKit.Service.Thermostat)
             .getCharacteristic(HomeKit.Characteristic.TemperatureDisplayUnits)
             .on('set', (value, callback) => {
+                storage.set('temperatureDisplayUnits', HomeKit.Characteristic.TemperatureDisplayUnits.CELSIUS);
+                
                 // DIABLED for now, as it's not really working yet
                 //
                 // global.muted('HK set TemperatureDisplayUnits:', value);
@@ -327,7 +335,7 @@ module.exports = async (SmartNodeServerPlugin) => {
             temperature: {
                 current: _fixTemperatureOut(storage.get('currentTemperature')),
                 target: _fixTemperatureOut(storage.get('targetTemperature')  || storage.get('currentTemperature')),
-                unit: !!storage.get('temperatureDisplayUnits') ? 'F' : 'C'
+                unit: !!storage.get('temperatureDisplayUnits') === HomeKit.Characteristic.TemperatureDisplayUnits.FAHRENHEIT ? 'F' : 'C'
             },
             heaterState: {
                 current: storage.get('currentHeatingCoolingState'),
