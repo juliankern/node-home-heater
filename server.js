@@ -1,6 +1,8 @@
 const pkg = require('./package.json');
 const moment = require('moment');
 const utils = global.req('util');
+const HomeKit = global.req('lib/homekit.js');
+const uuid = HomeKit.uuid.generate(`homekit:${pkg.name}`);
 
 module.exports = async (SmartNodeServerPlugin) => {
     let homekitProperties;
@@ -18,8 +20,6 @@ module.exports = async (SmartNodeServerPlugin) => {
         'heater.current',
         'heater.target'
     ];
-
-    let HomeKit = global.req('lib/homekit.js');
     
     if (storage.get('homekit-properties')) {
         homekitProperties = storage.get('homekit-properties');
@@ -27,18 +27,16 @@ module.exports = async (SmartNodeServerPlugin) => {
         homekitProperties = await generateHomekitProperties();
     }
 
-    SmartNodeServerPlugin.saveDisplayData('homekit', {
+    SmartNodeServerPlugin.addDisplayData('homekit', {
         description: "HomeKit pincode",
         type: "string",
         value: homekitProperties.pincode
     });
 
-    SmartNodeServerPlugin.on('globalsChanged', (changed) => {
-        console.log('Globals have changed, update?!', changed);
-    })
+    // SmartNodeServerPlugin.on('globalsChanged', (changed) => {
+    //     console.log('Globals have changed, update?!', changed);
+    // })
     
-    let uuid = HomeKit.uuid.generate(`homekit:${pkg.name}`);
-
     if (!storage.get('temperatureLogs')) {
         storage.set('temperatureLogs', []);
         nologs = true;
