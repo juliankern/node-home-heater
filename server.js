@@ -19,7 +19,7 @@ module.exports = async (SmartNodeServerPlugin) => {
         'heater.target'
     ];
 
-    let HomeKit = require('./lib/homekit.js');
+    let HomeKit = global.req('lib/homekit.js');
     
     if (storage.get('homekit-properties')) {
         homekitProperties = storage.get('homekit-properties');
