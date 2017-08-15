@@ -42,7 +42,7 @@ module.exports = async (SmartNodeServerPlugin) => {
         temperature: {
             current: _fixTemperatureOut(storage.get('currentTemperature')),
             target: _fixTemperatureOut(storage.get('targetTemperature') || storage.get('currentTemperature')),
-            unit: !!storage.get('temperatureDisplayUnits') ? 'F' : 'C'
+            unit: !!storage.get('temperatureDisplayUnits') === HomeKit.Characteristic.TemperatureDisplayUnits.FAHRENHEIT ? 'F' : 'C'
         },
         heater: {
             current: storage.get('currentHeatingCoolingState'),
