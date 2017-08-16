@@ -1,17 +1,28 @@
 const pkg = require('./package.json');
 const moment = require('moment');
 const utils = global.req('util');
-const HomeKit = global.req('lib/homekit.js');
-const uuid = HomeKit.uuid.generate(`homekit:${pkg.name}`);
+
+const SmartNodeHomeKit = global.req('classes/SmartNodeHomeKit.class');
+
+// const HomeKit = global.req('lib/homekit.js');
+// const uuid = HomeKit.uuid.generate(`homekit:${pkg.name}`);
 
 module.exports = async (SmartNodeServerPlugin) => {
     let homekitProperties;
     let nologs = false;
-    let thermostat;
 
     let config = SmartNodeServerPlugin.config;
     let storage = SmartNodeServerPlugin.storage;
     let socket = SmartNodeServerPlugin.socket;
+    
+    let thermostat = new SmartNodeHomeKit({ 
+        id: pkg.name, 
+        deviceName: `Thermostat ${config.room}`,
+        model: pkg.name,
+        service: 'Thermostat',
+        serial: 'A0000001',
+        manufacturer: 'juliankern.com'
+    });
     
     SmartNodeServerPlugin.globals.room = [
         'temperature.current',
@@ -46,7 +57,7 @@ module.exports = async (SmartNodeServerPlugin) => {
         temperature: {
             current: _fixTemperatureOut(storage.get('currentTemperature')),
             target: _fixTemperatureOut(storage.get('targetTemperature') || storage.get('currentTemperature')),
-            unit: !!storage.get('temperatureDisplayUnits') === HomeKit.Characteristic.TemperatureDisplayUnits.FAHRENHEIT ? 'F' : 'C'
+            unit: !!storage.get('temperatureDisplayUnits') === SmartNodeHomeKit.Characteristic.TemperatureDisplayUnits.FAHRENHEIT ? 'F' : 'C'
         },
         heater: {
             current: storage.get('currentHeatingCoolingState'),
@@ -61,19 +72,19 @@ module.exports = async (SmartNodeServerPlugin) => {
     
     function _checkHeaterStatus() {
         if (moment().diff(moment(storage.get('targetHeatingCoolingStateTime')), 'minutes', true) > 120) {
-            _setHomeKitState('targetHeatingCoolingState', 'TargetHeatingCoolingState', HomeKit.Characteristic.TargetHeatingCoolingState.AUTO);
+            _setHomeKitState('targetHeatingCoolingState', 'TargetHeatingCoolingState', SmartNodeHomeKit.Characteristic.TargetHeatingCoolingState.AUTO);
         }
         
-        if (storage.get('targetHeatingCoolingState') === HomeKit.Characteristic.TargetHeatingCoolingState.COOL) {
-            _setHomeKitState('targetHeatingCoolingState', 'TargetHeatingCoolingState', HomeKit.Characteristic.TargetHeatingCoolingState.AUTO);
+        if (storage.get('targetHeatingCoolingState') === SmartNodeHomeKit.Characteristic.TargetHeatingCoolingState.COOL) {
+            _setHomeKitState('targetHeatingCoolingState', 'TargetHeatingCoolingState', SmartNodeHomeKit.Characteristic.TargetHeatingCoolingState.AUTO);
         }
         
-        if (storage.get('targetHeatingCoolingState') === HomeKit.Characteristic.TargetHeatingCoolingState.OFF) {
+        if (storage.get('targetHeatingCoolingState') === SmartNodeHomeKit.Characteristic.TargetHeatingCoolingState.OFF) {
             console.log('targetHeatingCoolingState OFF', storage.get('targetHeatingCoolingState'))
             return _heater(false);
         }
 
-        if (storage.get('targetHeatingCoolingState') === HomeKit.Characteristic.TargetHeatingCoolingState.HEAT) {
+        if (storage.get('targetHeatingCoolingState') === SmartNodeHomeKit.Characteristic.TargetHeatingCoolingState.HEAT) {
             console.log('targetHeatingCoolingState HEAT', storage.get('targetHeatingCoolingState'))
             return _heater(true);
         }
@@ -93,7 +104,7 @@ module.exports = async (SmartNodeServerPlugin) => {
     function _heater(status) {
         // handle status here
         if (status) {
-            _setHomeKitState('currentHeatingCoolingState', 'CurrentHeatingCoolingState', HomeKit.Characteristic.CurrentHeatingCoolingState.HEAT);
+            _setHomeKitState('currentHeatingCoolingState', 'CurrentHeatingCoolingState', SmartNodeHomeKit.Characteristic.CurrentHeatingCoolingState.HEAT);
             socket.emit('on', () => {
                 global.warn('Turned heater ON!');
             });
@@ -101,7 +112,7 @@ module.exports = async (SmartNodeServerPlugin) => {
             return true;
         }
 
-        _setHomeKitState('currentHeatingCoolingState', 'CurrentHeatingCoolingState', HomeKit.Characteristic.CurrentHeatingCoolingState.OFF);
+        _setHomeKitState('currentHeatingCoolingState', 'CurrentHeatingCoolingState', SmartNodeHomeKit.Characteristic.CurrentHeatingCoolingState.OFF);
         socket.emit('off', () => {
             global.warn('Turned heater OFF!');
         });
@@ -114,8 +125,7 @@ module.exports = async (SmartNodeServerPlugin) => {
             storage.set(storageKey, value);
         }
 
-        thermostat.getService(HomeKit.Service.Thermostat)
-            .setCharacteristic(HomeKit.Characteristic[HKKey], value);
+        thermostat.set(HKKey, value);
     }
 
     function load() {
@@ -149,9 +159,8 @@ module.exports = async (SmartNodeServerPlugin) => {
             _checkHeaterStatus();
         });
 
-        thermostat = new HomeKit.Accessory(`Thermostat ${config.room}`, uuid);
 
-        thermostat.on('identify', (paired, callback) => {
+        thermostat.onIdentify((paired, callback) => {
             if (paired) {
                 storage.set('homekit-properties', homekitProperties);
             }
@@ -161,120 +170,85 @@ module.exports = async (SmartNodeServerPlugin) => {
             })
         });
 
-        thermostat.getService(HomeKit.Service.AccessoryInformation)
-            .setCharacteristic(HomeKit.Characteristic.Manufacturer, 'juliankern.com')
-            .setCharacteristic(HomeKit.Characteristic.Model, pkg.name)
-            .setCharacteristic(HomeKit.Characteristic.SerialNumber, 'A0000001');
+        thermostat.on('get', 'CurrentTemperature', (callback) => {
+            global.muted('HK get CurrentTemperature:', storage.get('currentTemperature'), 'fixed:', _fixTemperatureOut(storage.get('currentTemperature')));
+            // callback(null, _fixTemperatureOut(storage.get('currentTemperature')));
+            callback(null, storage.get('currentTemperature'));
+        })
 
-        thermostat.addService(HomeKit.Service.Thermostat, `Thermostat ${config.room}`)
-            .getCharacteristic(HomeKit.Characteristic.CurrentTemperature)
-            .on('get', (callback) => {
-                global.muted('HK get CurrentTemperature:', storage.get('currentTemperature'), 'fixed:', _fixTemperatureOut(storage.get('currentTemperature')));
-                // callback(null, _fixTemperatureOut(storage.get('currentTemperature')));
-                callback(null, storage.get('currentTemperature'));
-            })
-        ;
-        
-        thermostat.getService(HomeKit.Service.Thermostat)
-            .getCharacteristic(HomeKit.Characteristic.TargetTemperature)
-            .on('get', (callback) => {
-                global.muted('HK get TargetTemperature:', storage.get('targetTemperature') || storage.get('currentTemperature'), 'fixed:', _fixTemperatureOut(storage.get('targetTemperature') || storage.get('currentTemperature')));
-                // callback(null, _fixTemperatureOut(storage.get('targetTemperature') || storage.get('currentTemperature')));
-                callback(null, storage.get('targetTemperature') || storage.get('currentTemperature'));
-            })
-        ;
-        
-        thermostat.getService(HomeKit.Service.Thermostat)
-            .getCharacteristic(HomeKit.Characteristic.TargetTemperature)
-            .on('set', (value, callback) => {
-                global.muted('HK Set TargetTemperature:', value);
-                storage.set('targetTemperature', value);
+        thermostat.onBoth('TargetTemperature', (callback) => {
+            global.muted('HK get TargetTemperature:', storage.get('targetTemperature') || storage.get('currentTemperature'), 'fixed:', _fixTemperatureOut(storage.get('targetTemperature') || storage.get('currentTemperature')));
+            // callback(null, _fixTemperatureOut(storage.get('targetTemperature') || storage.get('currentTemperature')));
+            callback(null, storage.get('targetTemperature') || storage.get('currentTemperature'));
+        }, (value, callback) => {
+            global.muted('HK Set TargetTemperature:', value);
+            storage.set('targetTemperature', value);
 
-                SmartNodeServerPlugin.setGlobals({}, {
-                    temperature: {
-                        target: _fixTemperatureOut(storage.get('targetTemperature') || storage.get('currentTemperature')),
-                    }
-                });
+            SmartNodeServerPlugin.setGlobals({}, {
+                temperature: {
+                    target: _fixTemperatureOut(storage.get('targetTemperature') || storage.get('currentTemperature')),
+                }
+            });
 
-                _setHomeKitState(null, 'CurrentTemperature', storage.get('currentTemperature'));
+            _setHomeKitState(null, 'CurrentTemperature', storage.get('currentTemperature'));
 
-                _checkHeaterStatus();
+            _checkHeaterStatus();
 
-                callback();
-            })
-        ;
-        
-        thermostat.getService(HomeKit.Service.Thermostat)
-            .getCharacteristic(HomeKit.Characteristic.TemperatureDisplayUnits)
-            .on('get', (callback) => {
-                global.muted('HK get TemperatureDisplayUnits', storage.get('temperatureDisplayUnits') || HomeKit.Characteristic.TemperatureDisplayUnits.CELSIUS);
-                // callback(null, storage.get('temperatureDisplayUnits') || HomeKit.Characteristic.TemperatureDisplayUnits.CELSIUS);
-                callback(null, HomeKit.Characteristic.TemperatureDisplayUnits.CELSIUS);
-            })
-        ;
-        
-        thermostat.getService(HomeKit.Service.Thermostat)
-            .getCharacteristic(HomeKit.Characteristic.TemperatureDisplayUnits)
-            .on('set', (value, callback) => {
-                storage.set('temperatureDisplayUnits', HomeKit.Characteristic.TemperatureDisplayUnits.CELSIUS);
+            callback();
+        });
+
+        thermostat.onBoth('TemperatureDisplayUnits', (callback) => {
+            global.muted('HK get TemperatureDisplayUnits', storage.get('temperatureDisplayUnits') || SmartNodeHomeKit.Characteristic.TemperatureDisplayUnits.CELSIUS);
+            // callback(null, storage.get('temperatureDisplayUnits') || SmartNodeHomeKit.Characteristic.TemperatureDisplayUnits.CELSIUS);
+            callback(null, SmartNodeHomeKit.Characteristic.TemperatureDisplayUnits.CELSIUS);
+        }, (value, callback) => {
+            storage.set('temperatureDisplayUnits', SmartNodeHomeKit.Characteristic.TemperatureDisplayUnits.CELSIUS);
+            
+            // DIABLED for now, as it's not really working yet
+            //
+            // global.muted('HK set TemperatureDisplayUnits:', value);
+            // storage.set('temperatureDisplayUnits', value);
+
+            // SmartNodeServerPlugin.setGlobals({}, {
+            //     temperature: {
+            //         target: _fixTemperatureOut(storage.get('targetTemperature') || storage.get('currentTemperature')),
+            //         current: _fixTemperatureOut(storage.get('currentTemperature')),
+            //         unit: storage.get('temperatureDisplayUnits') === SmartNodeHomeKit.Characteristic.TemperatureDisplayUnits.FAHRENHEIT ? 'F' : 'C'
+            //     }
+            // });
+            
+            // thermostat.getService(HomeKit.Service.Thermostat)
+            //     .setCharacteristic(SmartNodeHomeKit.Characteristic.TargetTemperature, _fixTemperatureOut(storage.get('targetTemperature') || storage.get('currentTemperature')));
                 
-                // DIABLED for now, as it's not really working yet
-                //
-                // global.muted('HK set TemperatureDisplayUnits:', value);
-                // storage.set('temperatureDisplayUnits', value);
+            // thermostat.getService(HomeKit.Service.Thermostat)
+            //     .setCharacteristic(SmartNodeHomeKit.Characteristic.CurrentTemperature, _fixTemperatureOut(storage.get('currentTemperature')));
 
-                // SmartNodeServerPlugin.setGlobals({}, {
-                //     temperature: {
-                //         target: _fixTemperatureOut(storage.get('targetTemperature') || storage.get('currentTemperature')),
-                //         current: _fixTemperatureOut(storage.get('currentTemperature')),
-                //         unit: storage.get('temperatureDisplayUnits') === HomeKit.Characteristic.TemperatureDisplayUnits.FAHRENHEIT ? 'F' : 'C'
-                //     }
-                // });
-                
-                // thermostat.getService(HomeKit.Service.Thermostat)
-                //     .setCharacteristic(HomeKit.Characteristic.TargetTemperature, _fixTemperatureOut(storage.get('targetTemperature') || storage.get('currentTemperature')));
-                    
-                // thermostat.getService(HomeKit.Service.Thermostat)
-                //     .setCharacteristic(HomeKit.Characteristic.CurrentTemperature, _fixTemperatureOut(storage.get('currentTemperature')));
-
-                callback();
-            })
-        ;
+            callback();
+        });
         
-        thermostat.getService(HomeKit.Service.Thermostat)
-            .getCharacteristic(HomeKit.Characteristic.CurrentHeatingCoolingState)
-            .on('get', (callback) => {
-                global.muted('HK get CurrentHeatingCoolingState:', storage.get('currentHeatingCoolingState') || HomeKit.Characteristic.CurrentHeatingCoolingState.OFF);
-                callback(null, storage.get('currentHeatingCoolingState') || HomeKit.Characteristic.CurrentHeatingCoolingState.OFF);
-            })
-        ;
-        
-        thermostat.getService(HomeKit.Service.Thermostat)
-            .getCharacteristic(HomeKit.Characteristic.TargetHeatingCoolingState)
-            .on('get', (callback) => {
-                global.muted('HK get TargetHeatingCoolingState:', storage.get('targetHeatingCoolingState') || HomeKit.Characteristic.TargetHeatingCoolingState.AUTO);
-                callback(null, storage.get('targetHeatingCoolingState') || HomeKit.Characteristic.TargetHeatingCoolingState.AUTO);
-            })
-        ;
-        
-        thermostat.getService(HomeKit.Service.Thermostat)
-            .getCharacteristic(HomeKit.Characteristic.TargetHeatingCoolingState)
-            .on('set', (value, callback) => {
-                global.muted('HK Set TargetHeatingCoolingState:', value);
-                storage.set('targetHeatingCoolingState', value);
-                storage.set('targetHeatingCoolingStateTime', +moment());
+        thermostat.on('get', 'CurrentHeatingCoolingState', (callback) => {
+            global.muted('HK get CurrentHeatingCoolingState:', storage.get('currentHeatingCoolingState') || SmartNodeHomeKit.Characteristic.CurrentHeatingCoolingState.OFF);
+            callback(null, storage.get('currentHeatingCoolingState') || SmartNodeHomeKit.Characteristic.CurrentHeatingCoolingState.OFF);
+        });
 
-                SmartNodeServerPlugin.setGlobals({}, {
-                    heater: {
-                        target: storage.get('targetHeatingCoolingState')
-                    }
-                });
+        thermostat.onBoth('TargetHeatingCoolingState', (callback) => {
+            global.muted('HK get TargetHeatingCoolingState:', storage.get('targetHeatingCoolingState') || SmartNodeHomeKit.Characteristic.TargetHeatingCoolingState.AUTO);
+            callback(null, storage.get('targetHeatingCoolingState') || SmartNodeHomeKit.Characteristic.TargetHeatingCoolingState.AUTO);
+        }, (value, callback) => {
+            global.muted('HK Set TargetHeatingCoolingState:', value);
+            storage.set('targetHeatingCoolingState', value);
+            storage.set('targetHeatingCoolingStateTime', +moment());
 
-                _checkHeaterStatus();
-                
-                callback();
-            })
-        ;
+            SmartNodeServerPlugin.setGlobals({}, {
+                heater: {
+                    target: storage.get('targetHeatingCoolingState')
+                }
+            });
+
+            _checkHeaterStatus();
+            
+            callback();
+        });
         
         thermostat.publish(homekitProperties);
         
@@ -310,7 +284,7 @@ module.exports = async (SmartNodeServerPlugin) => {
         v = +v; // make sure its a number
         
         // temperatureDisplayUnits is 1 if Fahrenheit
-        if (storage.get('temperatureDisplayUnits') === HomeKit.Characteristic.TemperatureDisplayUnits.FAHRENHEIT) {
+        if (storage.get('temperatureDisplayUnits') === SmartNodeHomeKit.Characteristic.TemperatureDisplayUnits.FAHRENHEIT) {
             v = _CtoF(v);
         }
 
@@ -321,7 +295,7 @@ module.exports = async (SmartNodeServerPlugin) => {
         v = +v; // make sure its a number
         
         // temperatureDisplayUnits is 1 if Fahrenheit
-        if (storage.get('temperatureDisplayUnits') === HomeKit.Characteristic.TemperatureDisplayUnits.FAHRENHEIT) {
+        if (storage.get('temperatureDisplayUnits') === SmartNodeHomeKit.Characteristic.TemperatureDisplayUnits.FAHRENHEIT) {
             v = _FtoC(v);
         }
 
@@ -333,7 +307,7 @@ module.exports = async (SmartNodeServerPlugin) => {
             temperature: {
                 current: _fixTemperatureOut(storage.get('currentTemperature')),
                 target: _fixTemperatureOut(storage.get('targetTemperature')  || storage.get('currentTemperature')),
-                unit: !!storage.get('temperatureDisplayUnits') === HomeKit.Characteristic.TemperatureDisplayUnits.FAHRENHEIT ? 'F' : 'C'
+                unit: !!storage.get('temperatureDisplayUnits') === SmartNodeHomeKit.Characteristic.TemperatureDisplayUnits.FAHRENHEIT ? 'F' : 'C'
             },
             heaterState: {
                 current: storage.get('currentHeatingCoolingState'),
