@@ -1,3 +1,5 @@
+const pkg = require('./package.json');
+
 module.exports = async (SmartNodeClientPlugin) => {
     let temperatureInterval;
     let sensor;
@@ -14,13 +16,18 @@ module.exports = async (SmartNodeClientPlugin) => {
     }
     
     return {
+        init,
         load,
         unload
     }
+
+    function init() {
+        return [pkg.configuration, (data) => {
+            console.log('init done', data);
+        }];
+    }
     
     async function load() {
-        socket.emit('pluginloaded');
-        
         if (config.sensor) {
             let temperature = await _getTemperature();
             global.log('Send temperature', temperature);    
@@ -50,7 +57,9 @@ module.exports = async (SmartNodeClientPlugin) => {
                 })
             });
         }
-        
+
+        socket.emit('pluginloaded');
+
         return true;
     }
 

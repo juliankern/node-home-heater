@@ -39,8 +39,9 @@
             "description": "Data for the temperature sensor",
             "properties": {
                 "model": {
-                    "type": "string",
+                    "type": "select",
                     "description": "The model name. The \"ds1820\" is the most common one.",
+                    "values": [ "ds1820" ],
                     "default": "ds1820",
                     "required": true
                 },
