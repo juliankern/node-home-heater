@@ -22,7 +22,7 @@ module.exports = async (SmartNodeClientPlugin) => {
     }
 
     function init() {
-        return [pkg.configuration, (data) => {
+        return [pkg.configurationFormat, (data) => {
             console.log('init done', data);
         }];
     }

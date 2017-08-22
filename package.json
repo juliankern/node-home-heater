@@ -27,7 +27,7 @@
         "moment": "^2.18.1",
         "rpi-gpio": "^0.8.1"
     },
-    "configuration": {
+    "configurationFormat": {
         "relay": {
             "type": "number",
             "description": "GPIO port number of the heater relay",
