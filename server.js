@@ -44,6 +44,24 @@ module.exports = async (SmartNodeServerPlugin) => {
         value: homekitProperties.pincode
     });
 
+    SmartNodeServerPlugin.addDisplayData('currentTemperature', {
+        description: "Current temperature",
+        type: "string",
+        value: storage.get('currentTemperature') + '°' + (!!storage.get('temperatureDisplayUnits') === SmartNodeHomeKit.Characteristic.TemperatureDisplayUnits.FAHRENHEIT ? 'F' : 'C')
+    });
+
+    SmartNodeServerPlugin.addDisplayData('targetTemperature', {
+        description: "Target temperature",
+        type: "string",
+        value: (storage.get('targetTemperature') || storage.get('currentTemperature')) + '°' + (!!storage.get('temperatureDisplayUnits') === SmartNodeHomeKit.Characteristic.TemperatureDisplayUnits.FAHRENHEIT ? 'F' : 'C')
+    });
+
+    SmartNodeServerPlugin.addDisplayData('currentHeatingCoolingState', {
+        description: "Heater on",
+        type: "boolean",
+        value: storage.get('targetHeatingCoolingState') === SmartNodeHomeKit.Characteristic.TargetHeatingCoolingState.HEAT
+    });
+
     // SmartNodeServerPlugin.on('globalsChanged', (changed) => {
     //     console.log('Globals have changed, update?!', changed);
     // })
@@ -102,6 +120,10 @@ module.exports = async (SmartNodeServerPlugin) => {
     }
 
     function _heater(status) {
+        SmartNodeServerPlugin.updateDisplayData('currentHeatingCoolingState', {
+            value: status
+        });
+
         // handle status here
         if (status) {
             _setHomeKitState('currentHeatingCoolingState', 'CurrentHeatingCoolingState', SmartNodeHomeKit.Characteristic.CurrentHeatingCoolingState.HEAT);
@@ -156,6 +178,10 @@ module.exports = async (SmartNodeServerPlugin) => {
                 }
             });
 
+            SmartNodeServerPlugin.updateDisplayData('currentTemperature', {
+                value: storage.get('currentTemperature') + '°' + (!!storage.get('temperatureDisplayUnits') === SmartNodeHomeKit.Characteristic.TemperatureDisplayUnits.FAHRENHEIT ? 'F' : 'C')
+            });
+
             _checkHeaterStatus();
         });
 
@@ -190,7 +216,11 @@ module.exports = async (SmartNodeServerPlugin) => {
                 }
             });
 
-            _setHomeKitState(null, 'CurrentTemperature', storage.get('currentTemperature'));
+            SmartNodeServerPlugin.updateDisplayData('targetTemperature', {
+                value: storage.get('targetTemperature') + '°' + (!!storage.get('temperatureDisplayUnits') === SmartNodeHomeKit.Characteristic.TemperatureDisplayUnits.FAHRENHEIT ? 'F' : 'C')
+            });
+
+            _setHomeKitState(null, 'TargetTemperature', storage.get('targetTemperature'));
 
             _checkHeaterStatus();
 

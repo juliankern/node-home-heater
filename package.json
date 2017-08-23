@@ -27,6 +27,7 @@
         "moment": "^2.18.1",
         "rpi-gpio": "^0.8.1"
     },
+    "displayName": "Thermostat",
     "configurationFormat": {
         "relay": {
             "type": "number",
