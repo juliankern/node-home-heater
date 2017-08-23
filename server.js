@@ -10,95 +10,97 @@ const SmartNodeHomeKit = global.req('classes/SmartNodeHomeKit.class');
 module.exports = async (SmartNodeServerPlugin) => {
     let homekitProperties;
     let nologs = false;
+    let thermostat;
 
     let config = SmartNodeServerPlugin.config;
     let storage = SmartNodeServerPlugin.storage;
     let socket = SmartNodeServerPlugin.socket;
-    
-    ///////////////////////////////////////////////////////////////////
-
-    let thermostat = new SmartNodeHomeKit({ 
-        id: pkg.name, 
-        deviceName: `Thermostat ${config.room}`,
-        model: pkg.name,
-        service: 'Thermostat',
-        serial: 'A0000001',
-        manufacturer: 'juliankern.com'
-    });
-    
-    SmartNodeServerPlugin.globals.room = [
-        'temperature.current',
-        'temperature.target',
-        'temperature.unit',
-        'heater.current',
-        'heater.target'
-    ];
-    
-    ///////////////////////////////////////////////////////////////////
-
-    if (storage.get('homekit-properties')) {
-        homekitProperties = storage.get('homekit-properties');
-    } else {
-        homekitProperties = await generateHomekitProperties();
-    }
-
-    if (!storage.get('targetTemperature')) {
-        storage.set('targetTemperature', _fixTemperatureIn(20));
-    }
-
-    ///////////////////////////////////////////////////////////////////
-
-    SmartNodeServerPlugin.addDisplayData('homekit', {
-        description: "HomeKit pincode",
-        type: "string",
-        value: homekitProperties.pincode
-    });
-
-    SmartNodeServerPlugin.addDisplayData('currentTemperature', {
-        description: "Current temperature",
-        type: "string",
-        value: _fixTemperatureOut(storage.get('currentTemperature')).toFixed(1) + '°' + getUnit()
-    });
-
-    SmartNodeServerPlugin.addDisplayData('targetTemperature', {
-        description: "Target temperature",
-        type: "string",
-        value: _fixTemperatureOut(storage.get('targetTemperature')).toFixed(1) + '°' + getUnit()
-    });
-
-    SmartNodeServerPlugin.addDisplayData('currentHeatingCoolingState', {
-        description: "Heater on",
-        type: "boolean",
-        value: storage.get('targetHeatingCoolingState') === SmartNodeHomeKit.Characteristic.TargetHeatingCoolingState.HEAT
-    });
-
-    ///////////////////////////////////////////////////////////////////
-
-    // SmartNodeServerPlugin.on('globalsChanged', (changed) => {
-    //     console.log('Globals have changed, update?!', changed);
-    // })
-    
-    if (!storage.get('temperatureLogs')) {
-        storage.set('temperatureLogs', []);
-        nologs = true;
-    }
-    
-    SmartNodeServerPlugin.setGlobals({}, {
-        temperature: {
-            current: _fixTemperatureOut(storage.get('currentTemperature')),
-            target: _fixTemperatureOut(storage.get('targetTemperature')),
-            unit: !!storage.get('temperatureDisplayUnits') === SmartNodeHomeKit.Characteristic.TemperatureDisplayUnits.FAHRENHEIT ? 'F' : 'C'
-        },
-        heater: {
-            current: storage.get('currentHeatingCoolingState'),
-            target: storage.get('targetHeatingCoolingState')
-        }
-    });
 
     return {
         load,
-        unload
+        unload,
+        unpair
     } 
+    
+    async function init() {
+        thermostat = new SmartNodeHomeKit({ 
+            id: pkg.name, 
+            deviceName: `Thermostat ${config.room}`,
+            model: pkg.name,
+            service: 'Thermostat',
+            serial: 'A0000001',
+            manufacturer: 'juliankern.com'
+        });
+        
+        SmartNodeServerPlugin.globals.room = [
+            'temperature.current',
+            'temperature.target',
+            'temperature.unit',
+            'heater.current',
+            'heater.target'
+        ];
+        
+        ///////////////////////////////////////////////////////////////////
+
+        if (storage.get('homekit-properties')) {
+            homekitProperties = storage.get('homekit-properties');
+        } else {
+            homekitProperties = await generateHomekitProperties();
+        }
+
+        if (!storage.get('targetTemperature')) {
+            storage.set('targetTemperature', _fixTemperatureIn(20));
+        }
+
+        ///////////////////////////////////////////////////////////////////
+
+        SmartNodeServerPlugin.addDisplayData('currentTemperature', {
+            description: "Current temperature",
+            type: "string",
+            value: _fixTemperatureOut(storage.get('currentTemperature')).toFixed(1) + '°' + getUnit()
+        });
+
+        SmartNodeServerPlugin.addDisplayData('targetTemperature', {
+            description: "Target temperature",
+            type: "string",
+            value: _fixTemperatureOut(storage.get('targetTemperature')).toFixed(1) + '°' + getUnit()
+        });
+
+        SmartNodeServerPlugin.addDisplayData('currentHeatingCoolingState', {
+            description: "Heater on",
+            type: "boolean",
+            value: storage.get('targetHeatingCoolingState') === SmartNodeHomeKit.Characteristic.TargetHeatingCoolingState.HEAT
+        });
+        
+        SmartNodeServerPlugin.addDisplayData('homekit', {
+            description: "HomeKit pincode",
+            type: "homekitpin",
+            value: homekitProperties.pincode
+        });
+
+        ///////////////////////////////////////////////////////////////////
+
+        // SmartNodeServerPlugin.on('globalsChanged', (changed) => {
+        //     console.log('Globals have changed, update?!', changed);
+        // })
+        
+        if (!storage.get('temperatureLogs')) {
+            storage.set('temperatureLogs', []);
+            nologs = true;
+        }
+        
+        SmartNodeServerPlugin.setGlobals({}, {
+            temperature: {
+                current: _fixTemperatureOut(storage.get('currentTemperature')),
+                target: _fixTemperatureOut(storage.get('targetTemperature')),
+                unit: !!storage.get('temperatureDisplayUnits') === SmartNodeHomeKit.Characteristic.TemperatureDisplayUnits.FAHRENHEIT ? 'F' : 'C'
+            },
+            heater: {
+                current: storage.get('currentHeatingCoolingState'),
+                target: storage.get('targetHeatingCoolingState')
+            }
+        });
+    }
 
     function unload() {
         thermostat.destroy();
@@ -107,8 +109,15 @@ module.exports = async (SmartNodeServerPlugin) => {
         SmartNodeServerPlugin.removeGlobals();
         SmartNodeServerPlugin.removeAllDisplayData();
     }
+    
+    function unpair() {
+        storage.set('homekit-properties', undefined);
+        storage.set('targetTemperature', undefined);
+    }
 
-    function load() {
+    async function load() {
+        await init();
+        
         let logTimer = moment();
 
         socket.on('temperature', (data) => {
