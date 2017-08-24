@@ -2,7 +2,7 @@ const pkg = require('./package.json');
 const moment = require('moment');
 const utils = global.req('util');
 
-const SmartNodeHomeKit = global.req('classes/SmartNodeHomeKit.class');
+const SmartNodeHomeKit = global.req('classes/HomeKit.class');
 
 // const HomeKit = global.req('lib/homekit.js');
 // const uuid = HomeKit.uuid.generate(`homekit:${pkg.name}`);
