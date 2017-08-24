@@ -18,13 +18,18 @@ module.exports = async (SmartNodeClientPlugin) => {
     return {
         init,
         load,
-        unload
+        unload,
+        unpair
     }
 
     function init() {
         return [pkg, (data) => {
             console.log('init done', data);
         }];
+    }
+
+    function unpair() {
+        
     }
     
     async function load() {
