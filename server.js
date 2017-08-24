@@ -91,8 +91,8 @@ module.exports = async (SmartNodeServerPlugin) => {
         
         SmartNodeServerPlugin.setGlobals({}, {
             temperature: {
-                current: _fixTemperatureOut(storage.get('currentTemperature')),
-                target: _fixTemperatureOut(storage.get('targetTemperature')),
+                current: _fixTemperatureOut(storage.get('currentTemperature')).toFixed(1),
+                target: _fixTemperatureOut(storage.get('targetTemperature')).toFixed(1),
                 unit: !!storage.get('temperatureDisplayUnits') === SmartNodeHomeKit.Characteristic.TemperatureDisplayUnits.FAHRENHEIT ? 'F' : 'C'
             },
             heater: {
@@ -141,12 +141,12 @@ module.exports = async (SmartNodeServerPlugin) => {
             
             SmartNodeServerPlugin.setGlobals({}, {
                 temperature: {
-                    current: _fixTemperatureOut(storage.get('currentTemperature'))
+                    current: _fixTemperatureOut(storage.get('currentTemperature')).toFixed(1)
                 }
             });
 
             SmartNodeServerPlugin.updateDisplayData('currentTemperature', {
-                value: storage.get('currentTemperature') + '°' + getUnit()
+                value: _fixTemperatureOut(storage.get('currentTemperature')).toFixed(1) + '°' + getUnit()
             });
 
             _checkHeaterStatus();
@@ -179,12 +179,12 @@ module.exports = async (SmartNodeServerPlugin) => {
 
             SmartNodeServerPlugin.setGlobals({}, {
                 temperature: {
-                    target: _fixTemperatureOut(storage.get('targetTemperature')),
+                    target: _fixTemperatureOut(storage.get('targetTemperature')).toFixed(1),
                 }
             });
 
             SmartNodeServerPlugin.updateDisplayData('targetTemperature', {
-                value: _fixTemperatureOut(storage.get('targetTemperature')) + '°' + getUnit()
+                value: _fixTemperatureOut(storage.get('targetTemperature')).toFixed(1) + '°' + getUnit()
             });
 
             _setHomeKitState(null, 'TargetTemperature', storage.get('targetTemperature'));

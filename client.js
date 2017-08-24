@@ -7,14 +7,6 @@ module.exports = async (SmartNodeClientPlugin) => {
     let config = SmartNodeClientPlugin.config;
     let socket = SmartNodeClientPlugin.socket;
     
-    if (config.sensor) {
-        sensor = require('./lib/sensors.js')(config.sensor.model);
-    }
-    
-    if (config.relay) {
-        gpio = global.req('lib/gpio');
-    }
-    
     return {
         init,
         load,
@@ -24,7 +16,7 @@ module.exports = async (SmartNodeClientPlugin) => {
 
     function init() {
         return [pkg, (data) => {
-            console.log('init done', data);
+            // console.log('init done', data);
         }];
     }
 
@@ -32,8 +24,10 @@ module.exports = async (SmartNodeClientPlugin) => {
         
     }
     
-    async function load() {
+    async function load() {   
         if (config.sensor) {
+            sensor = require('./lib/sensors.js')(config.sensor.model);
+            
             let temperature = await _getTemperature();
             global.log('Send temperature', temperature);    
             socket.emit('temperature', { value: temperature, time: Date.now() });
@@ -46,6 +40,8 @@ module.exports = async (SmartNodeClientPlugin) => {
         }
         
         if (config.relay) {
+            gpio = global.req('lib/gpio');
+
             gpio.setup(config.relay, gpio.DIR_HIGH, () => {
                 // gpio is ready
                 socket.on('on', (cb) => {
