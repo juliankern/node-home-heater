@@ -49,7 +49,7 @@ module.exports = async (SmartNodeServerPlugin) => {
         }
 
         if (!(await storage.get('targetTemperature'))) {
-            await storage.set('targetTemperature', _fixTemperatureIn(20));
+            await storage.set('targetTemperature', 20);
         }
 
         ///////////////////////////////////////////////////////////////////
