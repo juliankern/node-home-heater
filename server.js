@@ -57,14 +57,14 @@ module.exports = async (SmartNodeServerPlugin) => {
         SmartNodeServerPlugin.addDisplayData('currentTemperature', {
             description: "Current temperature",
             type: "string",
-            value: await _getTemp('currentTemperature', true, 'both')
+            value: await _getTemp('currentTemperature', false, 'both')
         });
 
 
         SmartNodeServerPlugin.addDisplayData('targetTemperature', {
             description: "Target temperature",
             type: "string",
-            value: await _getTemp('targetTemperature', true, 'both')
+            value: await _getTemp('targetTemperature', false, 'both')
         });
 
         SmartNodeServerPlugin.addDisplayData('currentHeatingCoolingState', {
@@ -341,9 +341,9 @@ module.exports = async (SmartNodeServerPlugin) => {
     async function _getTemp(field = 'currentTemperature', fix, addSymbols = false) {
         let temp = await storage.get(field);
 
-        if (fix === 'in') {
+        if (fix === 'in' && (await storage.get('temperatureDisplayUnits')) === SmartNodeHomeKit.Characteristic.TemperatureDisplayUnits.FAHRENHEIT) {
             temp = _FtoC(temp);
-        } else if(fix) {
+        } else if(fix && (await storage.get('temperatureDisplayUnits')) === SmartNodeHomeKit.Characteristic.TemperatureDisplayUnits.FAHRENHEIT) {
             temp = _CtoF(temp);
         }
 
