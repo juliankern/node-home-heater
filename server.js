@@ -2,6 +2,7 @@ const pkg = require('./package.json');
 const moment = require('moment');
 const utils = global.req('util');
 
+const Logger = global.req('classes/Log.class');
 const SmartNodeHomeKit = global.req('classes/HomeKit.class');
 
 // const HomeKit = global.req('lib/homekit.js');
@@ -15,6 +16,8 @@ module.exports = async (SmartNodeServerPlugin) => {
     let config = SmartNodeServerPlugin.config;
     let storage = SmartNodeServerPlugin.storage;
     let socket = SmartNodeServerPlugin.socket;
+
+    let logger = new Logger();
 
     return {
         load,
@@ -122,7 +125,7 @@ module.exports = async (SmartNodeServerPlugin) => {
         let logTimer = moment();
 
         socket.on('temperature', async (data) => {
-            global.log('SmartNode server got temperature!', data);
+            logger.info('SmartNode server got temperature!', data);
             _setHomeKitState('currentTemperature', 'CurrentTemperature', data.value);
 
             // log every ~15 min or the first log instantly
@@ -165,17 +168,17 @@ module.exports = async (SmartNodeServerPlugin) => {
         });
 
         thermostat.on('get', 'CurrentTemperature', async (callback) => {
-            global.muted('HK get CurrentTemperature:', await storage.get('currentTemperature'), 'fixed:', await _getTemp('currentTemperature', true));
+            logger.debug('HK get CurrentTemperature:', await storage.get('currentTemperature'), 'fixed:', await _getTemp('currentTemperature', true));
             // callback(null, _fixTemperatureOut(storage.get('currentTemperature')));
             callback(null, await storage.get('currentTemperature'));
         })
 
         thermostat.onBoth('TargetTemperature', async (callback) => {
-            global.muted('HK get TargetTemperature:', storage.get('targetTemperature'), 'fixed:', await _getTemp('targetTemperature', true));
+            logger.debug('HK get TargetTemperature:', storage.get('targetTemperature'), 'fixed:', await _getTemp('targetTemperature', true));
             // callback(null, _fixTemperatureOut(await storage.get('targetTemperature')));
             callback(null, await storage.get('targetTemperature'));
         }, async (value, callback) => {
-            global.muted('HK Set TargetTemperature:', value);
+            logger.debug('HK Set TargetTemperature:', value);
             await storage.set('targetTemperature', value);
 
             SmartNodeServerPlugin.setGlobals({}, {
@@ -196,7 +199,7 @@ module.exports = async (SmartNodeServerPlugin) => {
         });
 
         thermostat.onBoth('TemperatureDisplayUnits', async (callback) => {
-            global.muted('HK get TemperatureDisplayUnits', await storage.get('temperatureDisplayUnits') || SmartNodeHomeKit.Characteristic.TemperatureDisplayUnits.CELSIUS);
+            logger.debug('HK get TemperatureDisplayUnits', await storage.get('temperatureDisplayUnits') || SmartNodeHomeKit.Characteristic.TemperatureDisplayUnits.CELSIUS);
             // callback(null, await storage.get('temperatureDisplayUnits') || SmartNodeHomeKit.Characteristic.TemperatureDisplayUnits.CELSIUS);
             callback(null, SmartNodeHomeKit.Characteristic.TemperatureDisplayUnits.CELSIUS);
         }, async (value, callback) => {
@@ -204,7 +207,7 @@ module.exports = async (SmartNodeServerPlugin) => {
 
             // DIABLED for now, as it's not really working yet
             //
-            // global.muted('HK set TemperatureDisplayUnits:', value);
+            // logger.debug('HK set TemperatureDisplayUnits:', value);
             // await storage.set('temperatureDisplayUnits', value);
 
             // SmartNodeServerPlugin.setGlobals({}, {
@@ -225,15 +228,15 @@ module.exports = async (SmartNodeServerPlugin) => {
         });
 
         thermostat.on('get', 'CurrentHeatingCoolingState', async (callback) => {
-            global.muted('HK get CurrentHeatingCoolingState:', await storage.get('currentHeatingCoolingState') || SmartNodeHomeKit.Characteristic.CurrentHeatingCoolingState.OFF);
+            logger.debug('HK get CurrentHeatingCoolingState:', await storage.get('currentHeatingCoolingState') || SmartNodeHomeKit.Characteristic.CurrentHeatingCoolingState.OFF);
             callback(null, await storage.get('currentHeatingCoolingState') || SmartNodeHomeKit.Characteristic.CurrentHeatingCoolingState.OFF);
         });
 
         thermostat.onBoth('TargetHeatingCoolingState', async (callback) => {
-            global.muted('HK get TargetHeatingCoolingState:', await storage.get('targetHeatingCoolingState') || SmartNodeHomeKit.Characteristic.TargetHeatingCoolingState.AUTO);
+            logger.debug('HK get TargetHeatingCoolingState:', await storage.get('targetHeatingCoolingState') || SmartNodeHomeKit.Characteristic.TargetHeatingCoolingState.AUTO);
             callback(null, await storage.get('targetHeatingCoolingState') || SmartNodeHomeKit.Characteristic.TargetHeatingCoolingState.AUTO);
         }, async (value, callback) => {
-            global.muted('HK Set TargetHeatingCoolingState:', value);
+            logger.debug('HK Set TargetHeatingCoolingState:', value);
             await storage.set('targetHeatingCoolingState', value);
             await storage.set('targetHeatingCoolingStateTime', +moment());
 
@@ -250,7 +253,7 @@ module.exports = async (SmartNodeServerPlugin) => {
 
         thermostat.publish(homekitProperties);
 
-        global.muted(`Published HomeKit ${pkg.name} with properties:`, homekitProperties);
+        logger.debug(`Published HomeKit ${pkg.name} with properties:`, homekitProperties);
     }
 
     async function _checkHeaterStatus() {
@@ -293,7 +296,7 @@ module.exports = async (SmartNodeServerPlugin) => {
         if (status) {
             _setHomeKitState('currentHeatingCoolingState', 'CurrentHeatingCoolingState', SmartNodeHomeKit.Characteristic.CurrentHeatingCoolingState.HEAT);
             socket.emit('on', () => {
-                global.warn('Turned heater ON!');
+                logger.warn('Turned heater ON!');
             });
 
             return true;
@@ -301,7 +304,7 @@ module.exports = async (SmartNodeServerPlugin) => {
 
         _setHomeKitState('currentHeatingCoolingState', 'CurrentHeatingCoolingState', SmartNodeHomeKit.Characteristic.CurrentHeatingCoolingState.OFF);
         socket.emit('off', () => {
-            global.warn('Turned heater OFF!');
+            logger.warn('Turned heater OFF!');
         });
 
         return false;

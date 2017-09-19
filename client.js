@@ -1,11 +1,14 @@
 const pkg = require('./package.json');
 
+const Logger = global.req('classes/Log.class');
+
 module.exports = async (SmartNodeClientPlugin) => {
     let temperatureInterval;
     let sensor;
     let gpio;
     let config = SmartNodeClientPlugin.config;
     let socket = SmartNodeClientPlugin.socket;
+    let logger = new Logger();
     
     return {
         init,
@@ -29,12 +32,12 @@ module.exports = async (SmartNodeClientPlugin) => {
             sensor = require('./lib/sensors.js')(config.sensor.model);
             
             let temperature = await _getTemperature();
-            global.log('Send temperature', temperature);    
+            logger.info('Send temperature', temperature);    
             socket.emit('temperature', { value: temperature, time: Date.now() });
             
             temperatureInterval = setInterval(async () => {
                 temperature = await _getTemperature();
-                global.log('Send temperature', temperature);
+                logger.info('Send temperature', temperature);
                 socket.emit('temperature', { value: temperature, time: Date.now() });
             }, (config.sensor.interval || 30) * 1000);
         }
@@ -53,7 +56,7 @@ module.exports = async (SmartNodeClientPlugin) => {
                 });
                 
                 socket.on('identify', (paired, cb) => {
-                    global.muted('HomeKit identify - paired:', paired);
+                    logger.debug('HomeKit identify - paired:', paired);
                     cb({ success: true });
                 })
             });
